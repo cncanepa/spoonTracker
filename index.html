@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spoon Drawer</title>
+<style>
+  :root {
+    --bg: #EDEEE4;
+    --surface: #FBF9F2;
+    --border: #E1DCC8;
+    --ink: #33392F;
+    --muted: #8A8352;
+    --muted2: #6B6753;
+    --good: #5B7F63;
+    --avg: #8A8352;
+    --flare: #A85042;
+    --gold: #E8B84B;
+    --gold-stroke: #8C7A3E;
+    --spent-fill: #D8D3C4;
+    --spent-stroke: #B7B09C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+  }
+  .container { width: 100%; max-width: 480px; padding: 24px 14px 60px; }
+  .hidden { display: none !important; }
+
+  /* Lock / sync screens */
+  .gate {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 14px;
+  }
+  .gate h1 { font-family: 'Space Grotesk', sans-serif; font-size: 28px; margin: 0; }
+  .gate p { color: var(--muted2); font-size: 14px; max-width: 320px; margin: 0; }
+  .gate input {
+    width: 240px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #C9C4AE;
+    font-size: 15px;
+    background: var(--surface);
+    text-align: center;
+  }
+  .gate button, .btn {
+    background: var(--good);
+    color: var(--surface);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .gate .error { color: var(--flare); font-size: 13px; min-height: 16px; }
+  .gate .code-box {
+    background: var(--surface);
+    border: 1.5px dashed var(--good);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    letter-spacing: 0.05em;
+  }
+  .gate .link-btn {
+    background: none;
+    border: none;
+    color: var(--good);
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  header.app-header { margin-bottom: 18px; text-align: center; }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  h1.title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    margin: 0;
+    color: #2D3B2C;
+  }
+
+  .date-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px; }
+  .date-row input[type=date] {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #C9C4AE;
+    background: var(--surface);
+  }
+  .date-label { font-size: 14px; color: var(--muted2); }
+
+  .banner {
+    border: 1.5px solid;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .banner-muted { font-size: 12px; color: #9B9683; text-align: center; margin-bottom: 16px; font-style: italic; }
+
+  .daytype-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .daytype-btn {
+    flex: 1;
+    border: 1.5px solid;
+    border-radius: 12px;
+    padding: 10px 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: #F3F1E9;
+    color: #4A4739;
+  }
+  .daytype-btn .sub { font-size: 11px; font-weight: 400; opacity: 0.85; }
+  .daytype-btn.active { color: var(--surface); }
+
+  .budget-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 18px; }
+  .budget-row .label { font-size: 13px; color: var(--muted2); margin-right: 4px; }
+  .small-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid #C9C4AE; background: var(--surface);
+    font-size: 16px; cursor: pointer; line-height: 1;
+  }
+  .budget-num { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; min-width: 24px; text-align: center; }
+
+  .spoon-row {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 18px 10px; margin-bottom: 16px;
+  }
+
+  .remaining-banner {
+    display: flex; flex-direction: column; align-items: center;
+    border-radius: 14px; border: 1.5px solid; padding: 14px 10px; margin-bottom: 24px;
+  }
+  .remaining-num { font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; }
+  .remaining-label { font-size: 12px; color: var(--muted2); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  section { margin-bottom: 24px; }
+  .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #2D3B2C; }
+
+  details.quick-add { margin-bottom: 10px; }
+  details.quick-add summary { font-size: 12px; color: var(--good); cursor: pointer; margin-bottom: 6px; font-weight: 600; }
+
+  .preset-scroll { max-height: 260px; overflow-y: auto; margin-bottom: 12px; padding-right: 4px; }
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .preset-btn {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; font-size: 13px; cursor: pointer; color: var(--ink); width: 100%; text-align: left;
+  }
+  .preset-cost { font-size: 12px; color: var(--muted); }
+
+  .custom-row { display: flex; gap: 6px; }
+  .custom-row input[type=text] {
+    flex: 1; padding: 9px 10px; border-radius: 10px; border: 1px solid #C9C4AE; font-size: 13px; background: var(--surface);
+  }
+  .custom-row input[type=number] {
+    width: 50px; padding: 9px 6px; border-radius: 10px; border: 1px solid #C9C4AE; font-size: 13px; text-align: center; background: var(--surface);
+  }
+  .add-btn {
+    background: var(--good); color: var(--surface); border: none; border-radius: 10px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
+  .empty-state { font-size: 13px; color: var(--muted); font-style: italic; padding: 8px 0; }
+  ul.entry-list { list-style: none; padding: 0; margin: 0 0 10px 0; display: flex; flex-direction: column; gap: 6px; }
+  .todo-item, .entry-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px; font-size: 13px;
+  }
+  .entry-item { justify-content: space-between; }
+  .check-btn {
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--good);
+    background: none; color: var(--good); font-size: 12px; cursor: pointer; line-height: 1; flex-shrink: 0;
+  }
+  .planned-note { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 2px; }
+  .entry-label { flex: 1; }
+  .entry-cost { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-right: 10px; }
+  .remove-btn { background: none; border: none; font-size: 18px; color: var(--flare); cursor: pointer; line-height: 1; }
+
+  .name-label { font-size: 12px; color: var(--muted2); display: flex; flex-direction: column; gap: 4px; }
+  .name-label input { padding: 8px 10px; border-radius: 10px; border: 1px solid #C9C4AE; font-size: 13px; background: var(--surface); }
+
+  .error-banner {
+    background: #E9D4CF; border: 1px solid var(--flare); border-radius: 10px; padding: 10px 12px;
+    font-size: 12px; color: #7A342A; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .retry-btn { background: var(--flare); color: var(--surface); border: none; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+
+  .footnote { font-size: 11px; color: #9B9683; text-align: center; margin-top: 8px; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Password gate -->
+  <div id="lock-screen" class="gate">
+    <h1>🥄 Spoon Drawer</h1>
+    <p>This tracker is private. Enter the password to continue.</p>
+    <input type="password" id="password-input" placeholder="Password" autocomplete="off" />
+    <button onclick="checkPassword()">Unlock</button>
+    <div class="error" id="password-error"></div>
+  </div>
+
+  <!-- Sync setup -->
+  <div id="sync-screen" class="gate hidden">
+    <h1>Connect this device</h1>
+    <p>Enter the sync code you and your partner share, or generate a new one if this is the first device.</p>
+    <input type="text" id="sync-input" placeholder="Sync code" autocomplete="off" />
+    <button onclick="connectSync()">Connect</button>
+    <button class="link-btn" onclick="generateSync()">Generate a new sync code instead</button>
+    <div class="error" id="sync-error"></div>
+    <div id="sync-generated" class="hidden" style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+      <p>Share this code with your partner — they'll enter it on their device:</p>
+      <div class="code-box" id="generated-code"></div>
+      <button onclick="useGeneratedCode()">Continue with this code</button>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" class="hidden">
+    <header class="app-header">
+      <div class="eyebrow">SHARED WITH YOUR PARTNER</div>
+      <h1 class="title">Spoon Drawer</h1>
+    </header>
+
+    <div class="date-row">
+      <input type="date" id="date-input" />
+      <div class="date-label" id="date-label"></div>
+    </div>
+
+    <div id="yesterday-banner"></div>
+
+    <div id="loading-indicator" class="loading hidden">Loading today's drawer…</div>
+
+    <div id="main-content" class="hidden">
+      <div class="daytype-row" id="daytype-row"></div>
+
+      <div class="budget-row">
+        <span class="label">Today's budget</span>
+        <button class="small-btn" onclick="adjustBudget(-1)">−</button>
+        <span class="budget-num" id="budget-num"></span>
+        <button class="small-btn" onclick="adjustBudget(1)">+</button>
+      </div>
+
+      <div class="spoon-row" id="spoon-row"></div>
+
+      <div class="remaining-banner" id="remaining-banner">
+        <span class="remaining-num" id="remaining-num"></span>
+        <span class="remaining-label" id="remaining-label"></span>
+      </div>
+
+      <section>
+        <div class="section-title">Log a task</div>
+        <div class="preset-scroll"><div class="preset-grid" id="preset-grid-entry"></div></div>
+        <div class="custom-row">
+          <input type="text" id="custom-label" placeholder="Custom task…" />
+          <input type="number" id="custom-cost" min="1" max="10" value="2" />
+          <button class="add-btn" onclick="addEntryFromForm()">Add</button>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">To do</div>
+        <div id="todo-list"></div>
+        <details class="quick-add">
+          <summary>Quick-add from list</summary>
+          <div class="preset-scroll"><div class="preset-grid" id="preset-grid-todo"></div></div>
+        </details>
+        <div class="custom-row">
+          <input type="text" id="todo-label" placeholder="Plan a task…" />
+          <input type="number" id="todo-cost" min="1" max="10" value="2" />
+          <button class="add-btn" onclick="addTodoFromForm()">Add</button>
+        </div>
+        <div class="planned-note" id="planned-note"></div>
+      </section>
+
+      <section>
+        <div class="section-title">Done</div>
+        <div id="done-list"></div>
+      </section>
+
+      <section>
+        <label class="name-label">
+          Logging as (optional)
+          <input type="text" id="name-input" placeholder="your name" />
+        </label>
+      </section>
+
+      <div id="error-container"></div>
+
+      <p class="footnote">This drawer is shared — anyone with your sync code can see and log spoons for the selected date.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const PASSWORD = "Softball";
+const KVDB_BASE = "https://kvdb.io";
+
+const DAY_TYPES = {
+  good: { label: "Good day", budget: 14, color: "#5B7F63" },
+  average: { label: "Average day", budget: 10, color: "#8A8352" },
+  flare: { label: "Flare day", budget: 5, color: "#A85042" },
+};
+
+const PRESETS = [
+  { label: "Shower", cost: 2 },
+  { label: "Short workout", cost: 3 },
+  { label: "Commute", cost: 2 },
+  { label: "Appointment", cost: 4 },
+  { label: "Errands (stacked)", cost: 4 },
+  { label: "Drive (per hr)", cost: 1 },
+  { label: "Show setup", cost: 5 },
+  { label: "Full show day", cost: 6 },
+  { label: "Vacuum", cost: 2 },
+  { label: "Dishes", cost: 1 },
+  { label: "Laundry (wash+fold)", cost: 2 },
+  { label: "Cook a meal", cost: 2 },
+  { label: "Meal prep (batch)", cost: 3 },
+  { label: "Grocery shop", cost: 3 },
+  { label: "Tidy a room", cost: 2 },
+  { label: "Clean bathroom", cost: 3 },
+  { label: "Price cards", cost: 3 },
+  { label: "Pack/organize inventory", cost: 3 },
+  { label: "Pack the car", cost: 3 },
+  { label: "Unpack/unload car", cost: 3 },
+  { label: "List cards online", cost: 2 },
+  { label: "Pet care/walk", cost: 1 },
+  { label: "Phone call/email admin", cost: 1 },
+  { label: "Social visit/hosting", cost: 3 },
+];
+
+let state = {
+  date: todayStr(),
+  dayType: "average",
+  customBudget: null,
+  entries: [],
+  todos: [],
+  name: localStorage.getItem("spoon_name") || "",
+  bucketId: null,
+  yesterday: null,
+};
+
+let saveTimer = null;
+
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+function prevDateStr(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+function formatDateLabel(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+/* ---------- Password gate ---------- */
+function checkPassword() {
+  const input = document.getElementById("password-input").value;
+  if (input === PASSWORD) {
+    document.getElementById("lock-screen").classList.add("hidden");
+    initSyncScreen();
+  } else {
+    document.getElementById("password-error").textContent = "Incorrect password.";
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("password-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") checkPassword();
+  });
+});
+
+/* ---------- Sync setup ---------- */
+function initSyncScreen() {
+  const saved = localStorage.getItem("spoon_bucket_id");
+  if (saved) {
+    state.bucketId = saved;
+    startApp();
+  } else {
+    document.getElementById("sync-screen").classList.remove("hidden");
+  }
+}
+
+async function generateSync() {
+  const errEl = document.getElementById("sync-error");
+  errEl.textContent = "Generating…";
+  try {
+    const res = await fetch(KVDB_BASE + "/", { method: "POST" });
+    if (!res.ok) throw new Error("request failed");
+    const bucketId = (await res.text()).trim();
+    document.getElementById("generated-code").textContent = bucketId;
+    document.getElementById("sync-generated").classList.remove("hidden");
+    document.getElementById("sync-generated").dataset.bucket = bucketId;
+    errEl.textContent = "";
+  } catch (e) {
+    errEl.textContent = "Couldn't generate a code — check your connection and try again.";
+  }
+}
+
+function useGeneratedCode() {
+  const bucketId = document.getElementById("sync-generated").dataset.bucket;
+  localStorage.setItem("spoon_bucket_id", bucketId);
+  state.bucketId = bucketId;
+  startApp();
+}
+
+function connectSync() {
+  const code = document.getElementById("sync-input").value.trim();
+  if (!code) {
+    document.getElementById("sync-error").textContent = "Enter a sync code first.";
+    return;
+  }
+  localStorage.setItem("spoon_bucket_id", code);
+  state.bucketId = code;
+  startApp();
+}
+
+/* ---------- App start ---------- */
+function startApp() {
+  document.getElementById("sync-screen").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  document.getElementById("date-input").value = state.date;
+  document.getElementById("date-input").addEventListener("change", (e) => {
+    state.date = e.target.value;
+    loadDay();
+    loadYesterday();
+  });
+  document.getElementById("name-input").value = state.name;
+  document.getElementById("name-input").addEventListener("input", (e) => {
+    state.name = e.target.value;
+    localStorage.setItem("spoon_name", state.name);
+  });
+  renderDayTypeButtons();
+  renderPresetGrids();
+  loadDay();
+  loadYesterday();
+}
+
+/* ---------- KVDB helpers ---------- */
+async function kvGet(key) {
+  const res = await fetch(`${KVDB_BASE}/${state.bucketId}/${key}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("read failed");
+  return res.text();
+}
+async function kvSet(key, value) {
+  const res = await fetch(`${KVDB_BASE}/${state.bucketId}/${key}`, { method: "POST", body: value });
+  if (!res.ok) throw new Error("write failed");
+}
+
+/* ---------- Load / Save ---------- */
+async function loadDay() {
+  document.getElementById("loading-indicator").classList.remove("hidden");
+  document.getElementById("main-content").classList.add("hidden");
+  document.getElementById("date-label").textContent = formatDateLabel(state.date);
+  try {
+    const raw = await kvGet(`spoons_${state.date}`);
+    if (raw) {
+      const data = JSON.parse(raw);
+      state.dayType = data.dayType || "average";
+      state.customBudget = data.customBudget ?? null;
+      state.entries = data.entries || [];
+      state.todos = data.todos || [];
+    } else {
+      state.dayType = "average";
+      state.customBudget = null;
+      state.entries = [];
+      state.todos = [];
+    }
+  } catch (e) {
+    state.dayType = "average";
+    state.customBudget = null;
+    state.entries = [];
+    state.todos = [];
+  }
+  document.getElementById("loading-indicator").classList.add("hidden");
+  document.getElementById("main-content").classList.remove("hidden");
+  renderAll();
+}
+
+async function loadYesterday() {
+  const yDate = prevDateStr(state.date);
+  const bannerEl = document.getElementById("yesterday-banner");
+  try {
+    const raw = await kvGet(`spoons_${yDate}`);
+    if (raw) {
+      const data = JSON.parse(raw);
+      const yBudget = data.customBudget ?? DAY_TYPES[data.dayType || "average"].budget;
+      const ySpent = (data.entries || []).reduce((s, e) => s + e.cost, 0);
+      if (ySpent > yBudget) {
+        bannerEl.innerHTML = `<div class="banner" style="background:#E9D4CF;border-color:#A85042;">⚠️ You went <strong>${ySpent - yBudget} over</strong> yesterday (${ySpent}/${yBudget} spoons) — ease up today if you can.</div>`;
+      } else {
+        bannerEl.innerHTML = `<div class="banner" style="background:#E4E9DD;border-color:#5B7F63;">Yesterday: ${ySpent}/${yBudget} spoons — stayed within budget.</div>`;
+      }
+    } else {
+      bannerEl.innerHTML = `<div class="banner-muted">No spoon data logged yesterday.</div>`;
+    }
+  } catch (e) {
+    bannerEl.innerHTML = "";
+  }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  const errContainer = document.getElementById("error-container");
+  errContainer.innerHTML = "";
+  saveTimer = setTimeout(async () => {
+    const payload = JSON.stringify({
+      dayType: state.dayType,
+      customBudget: state.customBudget,
+      entries: state.entries,
+      todos: state.todos,
+    });
+    try {
+      await kvSet(`spoons_${state.date}`, payload);
+    } catch (e) {
+      errContainer.innerHTML = `<div class="error-banner"><span>Save failed — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
+    }
+  }, 600);
+}
+
+async function retrySave() {
+  const errContainer = document.getElementById("error-container");
+  errContainer.innerHTML = "";
+  const payload = JSON.stringify({
+    dayType: state.dayType,
+    customBudget: state.customBudget,
+    entries: state.entries,
+    todos: state.todos,
+  });
+  try {
+    await kvSet(`spoons_${state.date}`, payload);
+  } catch (e) {
+    errContainer.innerHTML = `<div class="error-banner"><span>Save failed — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
+  }
+}
+
+/* ---------- Actions ---------- */
+function updateDayType(type) {
+  state.dayType = type;
+  state.customBudget = null;
+  renderAll();
+  scheduleSave();
+}
+function adjustBudget(delta) {
+  const current = state.customBudget ?? DAY_TYPES[state.dayType].budget;
+  state.customBudget = Math.max(1, current + delta);
+  renderAll();
+  scheduleSave();
+}
+function addEntry(label, cost) {
+  if (!label || !cost) return;
+  state.entries.push({ id: Date.now().toString(), label, cost: Number(cost), by: state.name || "someone", time: new Date().toISOString() });
+  renderAll();
+  scheduleSave();
+}
+function addEntryFromForm() {
+  const label = document.getElementById("custom-label").value.trim();
+  const cost = document.getElementById("custom-cost").value;
+  if (!label) return;
+  addEntry(label, cost);
+  document.getElementById("custom-label").value = "";
+  document.getElementById("custom-cost").value = 2;
+}
+function removeEntry(id) {
+  state.entries = state.entries.filter((e) => e.id !== id);
+  renderAll();
+  scheduleSave();
+}
+function addTodo(label, cost) {
+  if (!label || !cost) return;
+  state.todos.push({ id: Date.now().toString(), label, cost: Number(cost), addedBy: state.name || "someone" });
+  renderAll();
+  scheduleSave();
+}
+function addTodoFromForm() {
+  const label = document.getElementById("todo-label").value.trim();
+  const cost = document.getElementById("todo-cost").value;
+  if (!label) return;
+  addTodo(label, cost);
+  document.getElementById("todo-label").value = "";
+  document.getElementById("todo-cost").value = 2;
+}
+function removeTodo(id) {
+  state.todos = state.todos.filter((t) => t.id !== id);
+  renderAll();
+  scheduleSave();
+}
+function completeTodo(id) {
+  const todo = state.todos.find((t) => t.id === id);
+  if (!todo) return;
+  state.todos = state.todos.filter((t) => t.id !== id);
+  state.entries.push({ id: Date.now().toString(), label: todo.label, cost: todo.cost, by: state.name || "someone", time: new Date().toISOString() });
+  renderAll();
+  scheduleSave();
+}
+
+/* ---------- Rendering ---------- */
+function renderDayTypeButtons() {
+  const row = document.getElementById("daytype-row");
+  row.innerHTML = "";
+  Object.entries(DAY_TYPES).forEach(([key, d]) => {
+    const btn = document.createElement("button");
+    btn.className = "daytype-btn";
+    btn.onclick = () => updateDayType(key);
+    btn.innerHTML = `${d.label}<span class="sub">${d.budget} spoons</span>`;
+    btn.dataset.key = key;
+    btn.style.borderColor = d.color;
+    row.appendChild(btn);
+  });
+}
+
+function renderPresetGrids() {
+  ["preset-grid-entry", "preset-grid-todo"].forEach((gridId) => {
+    const grid = document.getElementById(gridId);
+    grid.innerHTML = "";
+    PRESETS.forEach((p) => {
+      const btn = document.createElement("button");
+      btn.className = "preset-btn";
+      btn.innerHTML = `<span>${p.label}</span><span class="preset-cost">${p.cost}🥄</span>`;
+      btn.onclick = () => gridId === "preset-grid-entry" ? addEntry(p.label, p.cost) : addTodo(p.label, p.cost);
+      grid.appendChild(btn);
+    });
+  });
+}
+
+function spoonSVG(spent) {
+  const fill = spent ? "var(--spent-fill)" : "var(--gold)";
+  const stroke = spent ? "var(--spent-stroke)" : "var(--gold-stroke)";
+  const opacity = spent ? 0.55 : 1;
+  return `<svg width="26" height="57" viewBox="0 0 20 44" style="opacity:${opacity}">
+    <ellipse cx="10" cy="9" rx="8" ry="9" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />
+    <rect x="8" y="17" width="4" height="25" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />
+  </svg>`;
+}
+
+function renderAll() {
+  const budget = state.customBudget ?? DAY_TYPES[state.dayType].budget;
+  const spent = state.entries.reduce((s, e) => s + e.cost, 0);
+  const remaining = Math.max(budget - spent, 0);
+  const over = spent > budget;
+
+  // day type buttons
+  document.querySelectorAll(".daytype-btn").forEach((btn) => {
+    const key = btn.dataset.key;
+    const isActive = state.dayType === key && !state.customBudget;
+    btn.classList.toggle("active", isActive);
+    btn.style.background = isActive ? DAY_TYPES[key].color : "#F3F1E9";
+    btn.style.color = isActive ? "#FBF9F2" : "#4A4739";
+  });
+
+  document.getElementById("budget-num").textContent = budget;
+
+  // spoon row
+  const spoonRow = document.getElementById("spoon-row");
+  spoonRow.innerHTML = "";
+  for (let i = 0; i < budget; i++) {
+    spoonRow.innerHTML += spoonSVG(i < spent);
+  }
+
+  // remaining banner
+  const remBanner = document.getElementById("remaining-banner");
+  remBanner.style.background = over ? "#E9D4CF" : "#E4E9DD";
+  remBanner.style.borderColor = over ? "#A85042" : "#5B7F63";
+  document.getElementById("remaining-num").textContent = over ? `${spent - budget} over` : remaining;
+  document.getElementById("remaining-num").style.color = over ? "#A85042" : "#3E5B44";
+  document.getElementById("remaining-label").textContent = over ? "budget exceeded — rest now" : "spoons remaining";
+
+  // todo list
+  const todoList = document.getElementById("todo-list");
+  if (state.todos.length === 0) {
+    todoList.innerHTML = `<div class="empty-state">Nothing planned yet.</div>`;
+  } else {
+    todoList.innerHTML = `<ul class="entry-list">${state.todos.map((t) => `
+      <li class="todo-item">
+        <button class="check-btn" onclick="completeTodo('${t.id}')" title="Mark done">✓</button>
+        <span class="entry-label">${escapeHtml(t.label)}</span>
+        <span class="entry-cost">${t.cost}🥄</span>
+        <button class="remove-btn" onclick="removeTodo('${t.id}')">×</button>
+      </li>`).join("")}</ul>`;
+  }
+  const plannedCost = state.todos.reduce((s, t) => s + t.cost, 0);
+  const plannedNote = document.getElementById("planned-note");
+  if (state.todos.length > 0) {
+    const wouldLeave = Math.max(remaining - plannedCost, 0);
+    plannedNote.textContent = `Planned cost: ${plannedCost}🥄 · would leave ${wouldLeave}🥄 if all done${plannedCost > remaining ? " — that's more than you have left" : ""}`;
+  } else {
+    plannedNote.textContent = "";
+  }
+
+  // done list
+  const doneList = document.getElementById("done-list");
+  if (state.entries.length === 0) {
+    doneList.innerHTML = `<div class="empty-state">Nothing logged yet.</div>`;
+  } else {
+    doneList.innerHTML = `<ul class="entry-list">${state.entries.map((e) => `
+      <li class="entry-item">
+        <span class="entry-label">${escapeHtml(e.label)}</span>
+        <span class="entry-cost">${e.cost}🥄</span>
+        <button class="remove-btn" onclick="removeEntry('${e.id}')">×</button>
+      </li>`).join("")}</ul>`;
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
