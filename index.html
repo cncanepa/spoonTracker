@@ -326,8 +326,7 @@
 
 <script>
 const PASSWORD = "Softball";
-const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
-const ACCESS_KEY = "$2a$10$2c/XTP4Xe7M/Z5aZu4dMn.nAdBtMSYPzQe6pPXhkNrXTw6Ood7VBW";
+const WORKER_BASE = "spoon-drawer-worker.cncanepa1.workers.dev"; // set this after deploying your Cloudflare Worker
 
 const DAY_TYPES = {
   good: { label: "Good day", budget: 14, color: "#5B7F63" },
@@ -420,14 +419,9 @@ async function generateSync() {
   const errEl = document.getElementById("sync-error");
   errEl.textContent = "Generating…";
   try {
-    const res = await fetch(JSONBIN_BASE, {
+    const res = await fetch(`${WORKER_BASE}/create`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Access-Key": ACCESS_KEY,
-        "X-Bin-Private": "true",
-        "X-Bin-Name": "spoon-drawer",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ days: {} }),
     });
     if (!res.ok) {
@@ -483,11 +477,9 @@ function startApp() {
   loadDay();
 }
 
-/* ---------- JSONBin helpers ---------- */
+/* ---------- Worker helpers (no key exposed client-side) ---------- */
 async function fetchAllDays() {
-  const res = await fetch(`${JSONBIN_BASE}/${state.bucketId}/latest`, {
-    headers: { "X-Access-Key": ACCESS_KEY, "X-Bin-Meta": "false" },
-  });
+  const res = await fetch(`${WORKER_BASE}/bin/${state.bucketId}`);
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
     throw new Error(`read failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 150) : ""}`);
@@ -497,9 +489,9 @@ async function fetchAllDays() {
 }
 
 async function writeAllDays(allDays) {
-  const res = await fetch(`${JSONBIN_BASE}/${state.bucketId}`, {
+  const res = await fetch(`${WORKER_BASE}/bin/${state.bucketId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "X-Access-Key": ACCESS_KEY },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ days: allDays }),
   });
   if (!res.ok) {
