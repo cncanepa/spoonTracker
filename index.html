@@ -326,7 +326,8 @@
 
 <script>
 const PASSWORD = "Softball";
-const WORKER_BASE = "spoon-drawer-worker.cncanepa1.workers.dev"; // set this after deploying your Cloudflare Worker
+const WORKER_BASE = "https://REPLACE-WITH-YOUR-WORKER-URL.workers.dev"; // set this after deploying your Cloudflare Worker
+const APP_SECRET = "REPLACE-WITH-YOUR-OWN-SECRET-PHRASE"; // must match the APP_SECRET you set in the Worker
 
 const DAY_TYPES = {
   good: { label: "Good day", budget: 14, color: "#5B7F63" },
@@ -421,7 +422,7 @@ async function generateSync() {
   try {
     const res = await fetch(`${WORKER_BASE}/create`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-App-Secret": APP_SECRET },
       body: JSON.stringify({ days: {} }),
     });
     if (!res.ok) {
@@ -479,7 +480,9 @@ function startApp() {
 
 /* ---------- Worker helpers (no key exposed client-side) ---------- */
 async function fetchAllDays() {
-  const res = await fetch(`${WORKER_BASE}/bin/${state.bucketId}`);
+  const res = await fetch(`${WORKER_BASE}/bin/${state.bucketId}`, {
+    headers: { "X-App-Secret": APP_SECRET },
+  });
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
     throw new Error(`read failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 150) : ""}`);
@@ -491,7 +494,7 @@ async function fetchAllDays() {
 async function writeAllDays(allDays) {
   const res = await fetch(`${WORKER_BASE}/bin/${state.bucketId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-App-Secret": APP_SECRET },
     body: JSON.stringify({ days: allDays }),
   });
   if (!res.ok) {
