@@ -326,7 +326,8 @@
 
 <script>
 const PASSWORD = "Softball";
-const KVDB_BASE = "https://kvdb.io";
+const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
+const ACCESS_KEY = "$2a$10$2c/XTP4Xe7M/Z5aZu4dMn.nAdBtMSYPzQe6pPXhkNrXTw6Ood7VBW";
 
 const DAY_TYPES = {
   good: { label: "Good day", budget: 14, color: "#5B7F63" },
@@ -419,21 +420,26 @@ async function generateSync() {
   const errEl = document.getElementById("sync-error");
   errEl.textContent = "Generating…";
   try {
-    const placeholderEmail = `spoon${Date.now()}@example.com`;
-    const res = await fetch(KVDB_BASE + "/", {
+    const res = await fetch(JSONBIN_BASE, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: "email=" + encodeURIComponent(placeholderEmail),
+      headers: {
+        "Content-Type": "application/json",
+        "X-Access-Key": ACCESS_KEY,
+        "X-Bin-Private": "true",
+        "X-Bin-Name": "spoon-drawer",
+      },
+      body: JSON.stringify({ days: {} }),
     });
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 100) : ""}`);
+      throw new Error(`HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 150) : ""}`);
     }
-    const bucketId = (await res.text()).trim();
-    if (!bucketId) throw new Error("empty response from server");
-    document.getElementById("generated-code").textContent = bucketId;
+    const data = await res.json();
+    const binId = data && data.metadata && data.metadata.id;
+    if (!binId) throw new Error("no bin id in response");
+    document.getElementById("generated-code").textContent = binId;
     document.getElementById("sync-generated").classList.remove("hidden");
-    document.getElementById("sync-generated").dataset.bucket = bucketId;
+    document.getElementById("sync-generated").dataset.bucket = binId;
     errEl.textContent = "";
   } catch (e) {
     errEl.textContent = `Couldn't generate a code (${e.message || "connection error"}). Check your connection and try again.`;
@@ -466,7 +472,6 @@ function startApp() {
   document.getElementById("date-input").addEventListener("change", (e) => {
     state.date = e.target.value;
     loadDay();
-    loadYesterday();
   });
   document.getElementById("name-input").value = state.name;
   document.getElementById("name-input").addEventListener("input", (e) => {
@@ -476,24 +481,30 @@ function startApp() {
   renderDayTypeButtons();
   renderPresetGrids();
   loadDay();
-  loadYesterday();
 }
 
-/* ---------- KVDB helpers ---------- */
-async function kvGet(key) {
-  const res = await fetch(`${KVDB_BASE}/${state.bucketId}/${key}`);
-  if (res.status === 404) return null;
+/* ---------- JSONBin helpers ---------- */
+async function fetchAllDays() {
+  const res = await fetch(`${JSONBIN_BASE}/${state.bucketId}/latest`, {
+    headers: { "X-Access-Key": ACCESS_KEY, "X-Bin-Meta": "false" },
+  });
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    throw new Error(`read failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 100) : ""}`);
+    throw new Error(`read failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 150) : ""}`);
   }
-  return res.text();
+  const data = await res.json();
+  return (data && data.days) || {};
 }
-async function kvSet(key, value) {
-  const res = await fetch(`${KVDB_BASE}/${state.bucketId}/${key}`, { method: "POST", body: value });
+
+async function writeAllDays(allDays) {
+  const res = await fetch(`${JSONBIN_BASE}/${state.bucketId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-Access-Key": ACCESS_KEY },
+    body: JSON.stringify({ days: allDays }),
+  });
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    throw new Error(`write failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 100) : ""}`);
+    throw new Error(`write failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 150) : ""}`);
   }
 }
 
@@ -503,9 +514,10 @@ async function loadDay() {
   document.getElementById("main-content").classList.add("hidden");
   document.getElementById("date-label").textContent = formatDateLabel(state.date);
   try {
-    const raw = await kvGet(`spoons_${state.date}`);
-    if (raw) {
-      const data = JSON.parse(raw);
+    const allDays = await fetchAllDays();
+    state._allDaysCache = allDays;
+    const data = allDays[state.date];
+    if (data) {
       state.dayType = data.dayType || "average";
       state.customBudget = data.customBudget ?? null;
       state.entries = data.entries || [];
@@ -516,36 +528,34 @@ async function loadDay() {
       state.entries = [];
       state.todos = [];
     }
+    renderYesterdayFromCache(allDays);
   } catch (e) {
     state.dayType = "average";
     state.customBudget = null;
     state.entries = [];
     state.todos = [];
+    document.getElementById("yesterday-banner").innerHTML = "";
+    document.getElementById("error-container").innerHTML = `<div class="error-banner"><span>Couldn't load your data (${escapeHtml(e.message || "unknown")}).</span><button class="retry-btn" onclick="loadDay()">Retry</button></div>`;
   }
   document.getElementById("loading-indicator").classList.add("hidden");
   document.getElementById("main-content").classList.remove("hidden");
   renderAll();
 }
 
-async function loadYesterday() {
+function renderYesterdayFromCache(allDays) {
   const yDate = prevDateStr(state.date);
   const bannerEl = document.getElementById("yesterday-banner");
-  try {
-    const raw = await kvGet(`spoons_${yDate}`);
-    if (raw) {
-      const data = JSON.parse(raw);
-      const yBudget = data.customBudget ?? DAY_TYPES[data.dayType || "average"].budget;
-      const ySpent = (data.entries || []).reduce((s, e) => s + e.cost, 0);
-      if (ySpent > yBudget) {
-        bannerEl.innerHTML = `<div class="banner" style="background:#E9D4CF;border-color:#A85042;">⚠️ You went <strong>${ySpent - yBudget} over</strong> yesterday (${ySpent}/${yBudget} spoons) — ease up today if you can.</div>`;
-      } else {
-        bannerEl.innerHTML = `<div class="banner" style="background:#E4E9DD;border-color:#5B7F63;">Yesterday: ${ySpent}/${yBudget} spoons — stayed within budget.</div>`;
-      }
+  const data = allDays[yDate];
+  if (data) {
+    const yBudget = data.customBudget ?? DAY_TYPES[data.dayType || "average"].budget;
+    const ySpent = (data.entries || []).reduce((s, e) => s + e.cost, 0);
+    if (ySpent > yBudget) {
+      bannerEl.innerHTML = `<div class="banner" style="background:#E9D4CF;border-color:#A85042;">⚠️ You went <strong>${ySpent - yBudget} over</strong> yesterday (${ySpent}/${yBudget} spoons) — ease up today if you can.</div>`;
     } else {
-      bannerEl.innerHTML = `<div class="banner-muted">No spoon data logged yesterday.</div>`;
+      bannerEl.innerHTML = `<div class="banner" style="background:#E4E9DD;border-color:#5B7F63;">Yesterday: ${ySpent}/${yBudget} spoons — stayed within budget.</div>`;
     }
-  } catch (e) {
-    bannerEl.innerHTML = "";
+  } else {
+    bannerEl.innerHTML = `<div class="banner-muted">No spoon data logged yesterday.</div>`;
   }
 }
 
@@ -553,35 +563,32 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   const errContainer = document.getElementById("error-container");
   errContainer.innerHTML = "";
-  saveTimer = setTimeout(async () => {
-    const payload = JSON.stringify({
-      dayType: state.dayType,
-      customBudget: state.customBudget,
-      entries: state.entries,
-      todos: state.todos,
-    });
-    try {
-      await kvSet(`spoons_${state.date}`, payload);
-    } catch (e) {
-      errContainer.innerHTML = `<div class="error-banner"><span>Save failed (${escapeHtml(e.message || "unknown")}) — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
-    }
-  }, 600);
+  saveTimer = setTimeout(doSave, 600);
 }
 
-async function retrySave() {
+async function doSave() {
   const errContainer = document.getElementById("error-container");
-  errContainer.innerHTML = "";
-  const payload = JSON.stringify({
+  const dayPayload = {
     dayType: state.dayType,
     customBudget: state.customBudget,
     entries: state.entries,
     todos: state.todos,
-  });
+  };
   try {
-    await kvSet(`spoons_${state.date}`, payload);
+    // Re-fetch fresh so we don't clobber a partner's concurrent edits to other days
+    const allDays = await fetchAllDays();
+    allDays[state.date] = dayPayload;
+    await writeAllDays(allDays);
+    state._allDaysCache = allDays;
+    errContainer.innerHTML = "";
   } catch (e) {
     errContainer.innerHTML = `<div class="error-banner"><span>Save failed (${escapeHtml(e.message || "unknown")}) — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
   }
+}
+
+function retrySave() {
+  document.getElementById("error-container").innerHTML = "";
+  doSave();
 }
 
 /* ---------- Actions ---------- */
