@@ -419,15 +419,24 @@ async function generateSync() {
   const errEl = document.getElementById("sync-error");
   errEl.textContent = "Generating…";
   try {
-    const res = await fetch(KVDB_BASE + "/", { method: "POST" });
-    if (!res.ok) throw new Error("request failed");
+    const placeholderEmail = `spoon${Date.now()}@example.com`;
+    const res = await fetch(KVDB_BASE + "/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "email=" + encodeURIComponent(placeholderEmail),
+    });
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 100) : ""}`);
+    }
     const bucketId = (await res.text()).trim();
+    if (!bucketId) throw new Error("empty response from server");
     document.getElementById("generated-code").textContent = bucketId;
     document.getElementById("sync-generated").classList.remove("hidden");
     document.getElementById("sync-generated").dataset.bucket = bucketId;
     errEl.textContent = "";
   } catch (e) {
-    errEl.textContent = "Couldn't generate a code — check your connection and try again.";
+    errEl.textContent = `Couldn't generate a code (${e.message || "connection error"}). Check your connection and try again.`;
   }
 }
 
@@ -474,12 +483,18 @@ function startApp() {
 async function kvGet(key) {
   const res = await fetch(`${KVDB_BASE}/${state.bucketId}/${key}`);
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error("read failed");
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`read failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 100) : ""}`);
+  }
   return res.text();
 }
 async function kvSet(key, value) {
   const res = await fetch(`${KVDB_BASE}/${state.bucketId}/${key}`, { method: "POST", body: value });
-  if (!res.ok) throw new Error("write failed");
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`write failed: HTTP ${res.status}${bodyText ? " — " + bodyText.slice(0, 100) : ""}`);
+  }
 }
 
 /* ---------- Load / Save ---------- */
@@ -548,7 +563,7 @@ function scheduleSave() {
     try {
       await kvSet(`spoons_${state.date}`, payload);
     } catch (e) {
-      errContainer.innerHTML = `<div class="error-banner"><span>Save failed — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
+      errContainer.innerHTML = `<div class="error-banner"><span>Save failed (${escapeHtml(e.message || "unknown")}) — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
     }
   }, 600);
 }
@@ -565,7 +580,7 @@ async function retrySave() {
   try {
     await kvSet(`spoons_${state.date}`, payload);
   } catch (e) {
-    errContainer.innerHTML = `<div class="error-banner"><span>Save failed — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
+    errContainer.innerHTML = `<div class="error-banner"><span>Save failed (${escapeHtml(e.message || "unknown")}) — tap Retry.</span><button class="retry-btn" onclick="retrySave()">Retry</button></div>`;
   }
 }
 
